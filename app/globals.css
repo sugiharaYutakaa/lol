@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-body: 'Saira', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background-color: #010a13;
+  color: #f0e6d2;
+  font-family: var(--font-body);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient hextech backdrop ------------------------------------------------ */
+.bg-rift {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1100px 700px at 50% -10%, rgba(10, 200, 185, 0.10), transparent 60%),
+    radial-gradient(900px 600px at 12% 110%, rgba(120, 90, 40, 0.16), transparent 55%),
+    radial-gradient(900px 600px at 88% 110%, rgba(0, 90, 130, 0.16), transparent 55%),
+    linear-gradient(180deg, #010a13 0%, #04141d 50%, #010a13 100%);
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(200, 170, 110, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 170, 110, 0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 78%);
+}
+
+/* Gold filigree divider --------------------------------------------------- */
+.filigree {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #785a28 18%,
+    #c8aa6e 50%,
+    #785a28 82%,
+    transparent
+  );
+  position: relative;
+}
+.filigree::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  background: #c8aa6e;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 8px rgba(200, 170, 110, 0.6);
+}
+
+/* Hex-clipped frame for champion portraits -------------------------------- */
+.hex {
+  clip-path: polygon(
+    50% 0%,
+    100% 25%,
+    100% 75%,
+    50% 100%,
+    0% 75%,
+    0% 25%
+  );
+}
+
+/* Beveled gold panel ------------------------------------------------------ */
+.panel {
+  background: linear-gradient(180deg, rgba(30, 35, 40, 0.85), rgba(9, 16, 22, 0.9));
+  border: 1px solid #463714;
+  position: relative;
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(200, 170, 110, 0.18);
+  pointer-events: none;
+}
+
+/* Text utilities ---------------------------------------------------------- */
+.tracking-display {
+  letter-spacing: 0.14em;
+}
+
+.text-glow-gold {
+  text-shadow: 0 0 14px rgba(200, 170, 110, 0.45);
+}
+
+/* Custom scrollbar -------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #04141d;
+}
+::-webkit-scrollbar-thumb {
+  background: #463714;
+  border: 1px solid #785a28;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #785a28;
+}
