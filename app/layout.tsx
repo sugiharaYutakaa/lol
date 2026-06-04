@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import HextechParticles from '@/components/HextechParticles';
 
 export const metadata: Metadata = {
   title: 'Rift Pick — LoL ピックアドバイザー',
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body>
         <div className="bg-rift" aria-hidden />
         <div className="bg-grid" aria-hidden />
+        <HextechParticles />
         {children}
       </body>
     </html>

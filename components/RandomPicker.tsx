@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import gsap from 'gsap';
 import type { LaneId, Recommendation } from '@/lib/types';
 import { deleteRow } from '@/lib/csv-api';
 import ChampionTile from './ChampionTile';
@@ -20,10 +21,50 @@ export default function RandomPicker({ pool, lane, editable }: Props) {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [modal, setModal] = useState(false);
   const [showPool, setShowPool] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const lockedRef = useRef<HTMLParagraphElement>(null);
+
+  // Entrance animation
+  useEffect(() => {
+    if (!panelRef.current || !buttonRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        panelRef.current,
+        { opacity: 0, y: 30, scale: 0.97 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, delay: 0.2, ease: 'power3.out' },
+      );
+      gsap.fromTo(
+        buttonRef.current,
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, delay: 0.5, ease: 'power3.out' },
+      );
+    });
+
+    return () => ctx.revert();
+  }, []);
 
   const roll = useCallback(() => {
     if (rolling || pool.length === 0) return;
     setRolling(true);
+
+    // Shake the panel on roll start
+    if (panelRef.current) {
+      gsap.fromTo(
+        panelRef.current,
+        { boxShadow: '0 0 0px rgba(10, 200, 185, 0)' },
+        {
+          boxShadow: '0 0 25px rgba(10, 200, 185, 0.4)',
+          duration: 0.3,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut',
+        },
+      );
+    }
+
     const start = Date.now();
     const duration = 1300;
     if (timer.current) clearInterval(timer.current);
@@ -32,8 +73,45 @@ export default function RandomPicker({ pool, lane, editable }: Props) {
       setCurrent(Math.floor(Math.random() * pool.length));
       if (elapsed >= duration) {
         if (timer.current) clearInterval(timer.current);
-        setCurrent(Math.floor(Math.random() * pool.length));
+        const finalPick = Math.floor(Math.random() * pool.length);
+        setCurrent(finalPick);
         setRolling(false);
+
+        // Stop panel glow and do a "locked in" burst
+        if (panelRef.current) {
+          gsap.killTweensOf(panelRef.current);
+          gsap.to(panelRef.current, {
+            boxShadow: '0 0 30px rgba(200, 170, 110, 0.5)',
+            duration: 0.3,
+            ease: 'power2.out',
+          });
+          gsap.to(panelRef.current, {
+            boxShadow: '0 0 0px rgba(200, 170, 110, 0)',
+            duration: 1,
+            delay: 0.3,
+            ease: 'power2.out',
+          });
+        }
+
+        // Scale bounce on the result
+        if (resultRef.current) {
+          gsap.fromTo(
+            resultRef.current,
+            { scale: 1.15 },
+            { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.4)' },
+          );
+        }
+
+        // "Locked In" text entrance
+        setTimeout(() => {
+          if (lockedRef.current) {
+            gsap.fromTo(
+              lockedRef.current,
+              { opacity: 0, scale: 0.7, y: 5 },
+              { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'back.out(2)' },
+            );
+          }
+        }, 100);
       }
     }, 80);
   }, [pool, rolling]);
@@ -55,9 +133,13 @@ export default function RandomPicker({ pool, lane, editable }: Props) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="panel w-full max-w-md py-10 flex flex-col items-center min-h-[18rem] justify-center">
+      <div
+        ref={panelRef}
+        className="panel w-full max-w-md py-10 flex flex-col items-center min-h-[18rem] justify-center"
+        style={{ opacity: 0 }}
+      >
         {picked ? (
-          <div className={rolling ? 'opacity-70' : ''}>
+          <div ref={resultRef} className={rolling ? 'opacity-70' : ''}>
             <ChampionTile
               champion={picked.champion}
               size="lg"
@@ -76,17 +158,23 @@ export default function RandomPicker({ pool, lane, editable }: Props) {
           </div>
         )}
         {picked && !rolling && (
-          <p className="mt-4 text-xs tracking-display text-hextech uppercase animate-fade-up">
+          <p
+            ref={lockedRef}
+            className="mt-4 text-xs tracking-display text-hextech uppercase"
+            style={{ opacity: 0 }}
+          >
             Locked In
           </p>
         )}
       </div>
 
       <button
+        ref={buttonRef}
         type="button"
         onClick={roll}
         disabled={rolling}
         className="mt-7 px-10 py-3 font-display tracking-display uppercase text-sm border border-gold-dark bg-gradient-to-b from-gold-deep/60 to-abyss text-gold-bright transition-all duration-300 hover:border-gold hover:shadow-gold disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ opacity: 0 }}
       >
         {rolling ? '抽選中…' : picked ? 'もう一度抽選' : '抽選する'}
       </button>

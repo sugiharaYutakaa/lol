@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import gsap from 'gsap';
 import type { Champion, LaneId, Recommendation } from '@/lib/types';
 import { deleteRow } from '@/lib/csv-api';
 import ChampionTile from './ChampionTile';
@@ -26,8 +27,39 @@ export default function CounterPicker({ data, lane, editable }: Props) {
     initial?: Record<string, string>;
     match?: Record<string, string>;
   } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   const selected = data.find((d) => d.enemy.key === enemyKey) ?? null;
+
+  // Animate counter picks panel when enemy is selected
+  useEffect(() => {
+    if (!selected || !detailRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        detailRef.current,
+        { opacity: 0, x: 30 },
+        { opacity: 1, x: 0, duration: 0.5, ease: 'power3.out' },
+      );
+
+      gsap.fromTo(
+        '.counter-card',
+        { opacity: 0, y: 30, scale: 0.95 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.5,
+          stagger: 0.08,
+          delay: 0.15,
+          ease: 'back.out(1.2)',
+        },
+      );
+    }, detailRef.current);
+
+    return () => ctx.revert();
+  }, [selected]);
 
   const handleDelete = async (enemy: string, p: Recommendation) => {
     if (!confirm(`${p.champion.name} を削除しますか？`)) return;
@@ -46,7 +78,7 @@ export default function CounterPicker({ data, lane, editable }: Props) {
 
   if (!selected) {
     return (
-      <div>
+      <div ref={containerRef}>
         <p className="text-gold-bright/70 text-sm mb-6">
           相手のチャンピオンを選択してください。
         </p>
@@ -95,7 +127,7 @@ export default function CounterPicker({ data, lane, editable }: Props) {
   }
 
   return (
-    <div>
+    <div ref={detailRef} style={{ opacity: 0 }}>
       <button
         type="button"
         onClick={() => setEnemyKey(null)}
@@ -123,7 +155,8 @@ export default function CounterPicker({ data, lane, editable }: Props) {
         {selected.picks.map((p, i) => (
           <div
             key={p.champion.key}
-            className="panel p-5 flex flex-col items-center relative group/item"
+            className="counter-card panel p-5 flex flex-col items-center relative group/item"
+            style={{ opacity: 0 }}
           >
             <ChampionTile
               champion={p.champion}

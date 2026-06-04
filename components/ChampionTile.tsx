@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import type { Champion } from '@/lib/types';
 
 interface Props {
@@ -27,15 +28,56 @@ export default function ChampionTile({
   delayMs = 0,
 }: Props) {
   const [broken, setBroken] = useState(false);
+  const tileRef = useRef<HTMLDivElement>(null);
+  const hexRef = useRef<HTMLDivElement>(null);
   const interactive = typeof onClick === 'function';
+
+  // Entrance animation
+  useEffect(() => {
+    if (!tileRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        tileRef.current,
+        { opacity: 0, y: 24, scale: 0.92 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.55,
+          delay: delayMs / 1000,
+          ease: 'back.out(1.3)',
+        },
+      );
+    }, tileRef.current!);
+
+    return () => ctx.revert();
+  }, [delayMs]);
+
+  // Hover animation for interactive tiles
+  const handleMouseEnter = useCallback(() => {
+    if (!hexRef.current || !interactive) return;
+    gsap.to(hexRef.current, {
+      scale: 1.1,
+      duration: 0.3,
+      ease: 'power2.out',
+    });
+  }, [interactive]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!hexRef.current || !interactive) return;
+    gsap.to(hexRef.current, {
+      scale: 1,
+      duration: 0.3,
+      ease: 'power2.out',
+    });
+  }, [interactive]);
 
   const portrait = (
     <div
-      className={`relative ${SIZES[size]} hex transition-transform duration-300 ${
-        interactive ? 'group-hover:scale-105' : ''
-      }`}
+      ref={hexRef}
+      className={`relative ${SIZES[size]} hex transition-transform duration-300`}
     >
-      {/* gold frame underlay */}
       <div
         className={`absolute inset-0 hex ${
           selected ? 'bg-gold-bright' : 'bg-gold-dark'
@@ -79,7 +121,7 @@ export default function ChampionTile({
   );
 
   const wrapperClass =
-    'group flex flex-col items-center animate-fade-up' +
+    'group flex flex-col items-center' +
     (interactive ? ' cursor-pointer' : '');
 
   if (interactive) {
@@ -88,7 +130,10 @@ export default function ChampionTile({
         type="button"
         onClick={onClick}
         className={wrapperClass}
-        style={{ animationDelay: `${delayMs}ms` }}
+        ref={tileRef as React.Ref<HTMLDivElement> & React.Ref<HTMLButtonElement>}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{ opacity: 0 }}
       >
         {body}
       </button>
@@ -96,7 +141,13 @@ export default function ChampionTile({
   }
 
   return (
-    <div className={wrapperClass} style={{ animationDelay: `${delayMs}ms` }}>
+    <div
+      ref={tileRef}
+      className={wrapperClass}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{ opacity: 0 }}
+    >
       {body}
     </div>
   );

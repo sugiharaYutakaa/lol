@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import gsap from 'gsap';
 import type { LaneId, Recommendation } from '@/lib/types';
 import { deleteRow } from '@/lib/csv-api';
 import ChampionTile from './ChampionTile';
@@ -15,11 +16,40 @@ interface Props {
 
 export default function FirstPickView({ picks, lane, editable }: Props) {
   const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [modal, setModal] = useState<{
     mode: 'add' | 'edit';
     initial?: Record<string, string>;
     match?: Record<string, string>;
   } | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        '.fp-desc',
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' },
+      );
+
+      gsap.fromTo(
+        '.fp-card',
+        { opacity: 0, y: 35, scale: 0.95 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.5,
+          stagger: 0.1,
+          delay: 0.15,
+          ease: 'back.out(1.2)',
+        },
+      );
+    }, containerRef.current);
+
+    return () => ctx.revert();
+  }, []);
 
   const handleDelete = async (p: Recommendation) => {
     if (!confirm(`${p.champion.name} を削除しますか？`)) return;
@@ -44,15 +74,16 @@ export default function FirstPickView({ picks, lane, editable }: Props) {
   }
 
   return (
-    <div>
-      <p className="text-gold-bright/70 text-sm mb-8">
+    <div ref={containerRef}>
+      <p className="fp-desc text-gold-bright/70 text-sm mb-8 opacity-0">
         相手が見えない先出しでも腐りにくい安定ピックです。
       </p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
         {picks.map((p, i) => (
           <div
             key={p.champion.key}
-            className="panel p-5 flex flex-col items-center relative group/item"
+            className="fp-card panel p-5 flex flex-col items-center relative group/item"
+            style={{ opacity: 0 }}
           >
             <ChampionTile
               champion={p.champion}

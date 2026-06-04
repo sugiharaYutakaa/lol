@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import gsap from 'gsap';
 import type { BalanceCategory, LaneId, Recommendation } from '@/lib/types';
 import { BALANCE_CATEGORIES } from '@/lib/lanes';
 import { deleteRow } from '@/lib/csv-api';
@@ -16,11 +17,53 @@ interface Props {
 
 export default function BalanceView({ board, lane, editable }: Props) {
   const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [modal, setModal] = useState<{
     mode: 'add' | 'edit';
     initial?: Record<string, string>;
     match?: Record<string, string>;
   } | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        '.bv-desc',
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' },
+      );
+
+      // Stagger each section
+      gsap.fromTo(
+        '.bv-section',
+        { opacity: 0, y: 40 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          stagger: 0.15,
+          delay: 0.1,
+          ease: 'power3.out',
+        },
+      );
+
+      // Section filigrees
+      gsap.fromTo(
+        '.bv-section .filigree',
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          duration: 0.5,
+          stagger: 0.15,
+          delay: 0.3,
+          ease: 'power2.out',
+        },
+      );
+    }, containerRef.current);
+
+    return () => ctx.revert();
+  }, []);
 
   const handleDelete = async (category: BalanceCategory, p: Recommendation) => {
     if (!confirm(`${p.champion.name} を削除しますか？`)) return;
@@ -47,8 +90,8 @@ export default function BalanceView({ board, lane, editable }: Props) {
   }
 
   return (
-    <div>
-      <p className="text-gold-bright/70 text-sm mb-8">
+    <div ref={containerRef}>
+      <p className="bv-desc text-gold-bright/70 text-sm mb-8 opacity-0">
         チーム構成で不足しがちな役割を、カテゴリ別に確認できます。
       </p>
       <div className="space-y-10">
@@ -56,7 +99,7 @@ export default function BalanceView({ board, lane, editable }: Props) {
           const picks = board[cat.id] ?? [];
           if (picks.length === 0 && !editable) return null;
           return (
-            <section key={cat.id}>
+            <section key={cat.id} className="bv-section" style={{ opacity: 0 }}>
               <div className="flex items-baseline gap-3 mb-1">
                 <h2 className="font-display text-lg tracking-display text-hextech uppercase">
                   {cat.label}
