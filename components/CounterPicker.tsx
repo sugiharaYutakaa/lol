@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import type { Champion, Recommendation } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import type { Champion, LaneId, Recommendation } from '@/lib/types';
+import { deleteRow } from '@/lib/csv-api';
 import ChampionTile from './ChampionTile';
+import DataFormModal from './DataFormModal';
 
 export interface CounterEntry {
   enemy: Champion;
@@ -11,11 +14,35 @@ export interface CounterEntry {
 
 interface Props {
   data: CounterEntry[];
+  lane: LaneId;
+  editable: boolean;
 }
 
-export default function CounterPicker({ data }: Props) {
+export default function CounterPicker({ data, lane, editable }: Props) {
+  const router = useRouter();
   const [enemyKey, setEnemyKey] = useState<string | null>(null);
+  const [modal, setModal] = useState<{
+    mode: 'add' | 'edit';
+    initial?: Record<string, string>;
+    match?: Record<string, string>;
+  } | null>(null);
+
   const selected = data.find((d) => d.enemy.key === enemyKey) ?? null;
+
+  const handleDelete = async (enemy: string, p: Recommendation) => {
+    if (!confirm(`${p.champion.name} を削除しますか？`)) return;
+    try {
+      await deleteRow('counters.csv', {
+        lane,
+        enemy,
+        pick: p.champion.key,
+        reason: p.reason ?? '',
+      });
+      router.refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'エラーが発生しました');
+    }
+  };
 
   if (!selected) {
     return (
@@ -23,22 +50,45 @@ export default function CounterPicker({ data }: Props) {
         <p className="text-gold-bright/70 text-sm mb-6">
           相手のチャンピオンを選択してください。
         </p>
-        {data.length === 0 ? (
+        {data.length === 0 && !editable ? (
           <p className="text-gold/50 text-sm">
             このレーンのカウンターデータがまだありません。
           </p>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-y-6 gap-x-3">
-            {data.map((d, i) => (
-              <ChampionTile
-                key={d.enemy.key}
-                champion={d.enemy}
-                size="md"
-                onClick={() => setEnemyKey(d.enemy.key)}
-                delayMs={i * 50}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-y-6 gap-x-3">
+              {data.map((d, i) => (
+                <ChampionTile
+                  key={d.enemy.key}
+                  champion={d.enemy}
+                  size="md"
+                  onClick={() => setEnemyKey(d.enemy.key)}
+                  delayMs={i * 50}
+                />
+              ))}
+            </div>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setModal({ mode: 'add' })}
+                className="mt-8 w-full py-3 border border-dashed border-gold-dark text-gold/50 text-sm tracking-display uppercase hover:border-gold hover:text-gold-bright transition-colors"
+              >
+                + カウンターピックを追加
+              </button>
+            )}
+          </>
+        )}
+
+        {modal && (
+          <DataFormModal
+            isOpen
+            onClose={() => setModal(null)}
+            lane={lane}
+            csvFile="counters.csv"
+            editMode={modal.mode}
+            initialData={modal.initial}
+            originalMatch={modal.match}
+          />
         )}
       </div>
     );
@@ -51,7 +101,7 @@ export default function CounterPicker({ data }: Props) {
         onClick={() => setEnemyKey(null)}
         className="mb-6 text-xs tracking-display uppercase text-gold/70 hover:text-gold-bright transition-colors"
       >
-        ‹ 相手を選び直す
+        &lsaquo; 相手を選び直す
       </button>
 
       <div className="flex items-center gap-4 mb-8 panel p-4">
@@ -71,7 +121,10 @@ export default function CounterPicker({ data }: Props) {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
         {selected.picks.map((p, i) => (
-          <div key={p.champion.key} className="panel p-5 flex flex-col items-center">
+          <div
+            key={p.champion.key}
+            className="panel p-5 flex flex-col items-center relative group/item"
+          >
             <ChampionTile
               champion={p.champion}
               reason={p.reason}
@@ -79,9 +132,71 @@ export default function CounterPicker({ data }: Props) {
               selected
               delayMs={i * 60}
             />
+            {editable && (
+              <div className="absolute top-2 right-2 hidden group-hover/item:flex gap-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setModal({
+                      mode: 'edit',
+                      initial: {
+                        enemy: selected.enemy.key,
+                        pick: p.champion.key,
+                        reason: p.reason ?? '',
+                      },
+                      match: {
+                        lane,
+                        enemy: selected.enemy.key,
+                        pick: p.champion.key,
+                        reason: p.reason ?? '',
+                      },
+                    })
+                  }
+                  className="w-7 h-7 flex items-center justify-center text-xs bg-abyss/80 border border-gold-dark text-gold/70 hover:text-gold-bright hover:border-gold transition-colors"
+                  title="編集"
+                >
+                  E
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selected.enemy.key, p)}
+                  className="w-7 h-7 flex items-center justify-center text-xs bg-abyss/80 border border-gold-dark text-blood/70 hover:text-blood hover:border-blood transition-colors"
+                  title="削除"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
+
+      {editable && (
+        <button
+          type="button"
+          onClick={() =>
+            setModal({
+              mode: 'add',
+              initial: { enemy: selected.enemy.key },
+            })
+          }
+          className="mt-8 w-full py-3 border border-dashed border-gold-dark text-gold/50 text-sm tracking-display uppercase hover:border-gold hover:text-gold-bright transition-colors"
+        >
+          + {selected.enemy.name} へのカウンターを追加
+        </button>
+      )}
+
+      {modal && (
+        <DataFormModal
+          isOpen
+          onClose={() => setModal(null)}
+          lane={lane}
+          csvFile="counters.csv"
+          editMode={modal.mode}
+          initialData={modal.initial}
+          originalMatch={modal.match}
+        />
+      )}
     </div>
   );
 }

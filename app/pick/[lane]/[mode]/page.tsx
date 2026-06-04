@@ -26,12 +26,13 @@ export default async function ResultPage({
   const mode = getMode(params.mode);
   if (!lane || !mode) notFound();
   const laneId = lane.id as LaneId;
+  const editable = true;
 
   let view: React.ReactNode = null;
 
   if (mode.id === 'random') {
     const pool = await getRandomPool(laneId);
-    view = <RandomPicker pool={pool} />;
+    view = <RandomPicker pool={pool} lane={laneId} editable={editable} />;
   } else if (mode.id === 'counter') {
     const enemies = await getEnemyChampions(laneId);
     const entries: CounterEntry[] = [];
@@ -39,13 +40,13 @@ export default async function ResultPage({
       const picks = await getCounterPicks(laneId, e.champion.key);
       entries.push({ enemy: e.champion, picks });
     }
-    view = <CounterPicker data={entries} />;
+    view = <CounterPicker data={entries} lane={laneId} editable={editable} />;
   } else if (mode.id === 'first') {
     const picks = await getFirstPicks(laneId);
-    view = <FirstPickView picks={picks} />;
+    view = <FirstPickView picks={picks} lane={laneId} editable={editable} />;
   } else if (mode.id === 'balance') {
     const board = await getBalancePicks(laneId);
-    view = <BalanceView board={board} />;
+    view = <BalanceView board={board} lane={laneId} editable={editable} />;
   }
 
   return (

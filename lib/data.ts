@@ -1,6 +1,4 @@
 import 'server-only';
-import fs from 'node:fs';
-import path from 'node:path';
 import Papa from 'papaparse';
 import type {
   BalanceCategory,
@@ -12,12 +10,9 @@ import type {
   Recommendation,
 } from './types';
 import { getChampionMap, resolveChampion } from './ddragon';
+import { readCsvFromS3 } from './s3';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-
-function readCsv<T>(file: string): T[] {
-  const full = path.join(DATA_DIR, file);
-  const text = fs.readFileSync(full, 'utf8');
+function parseCsv<T>(text: string): T[] {
   const parsed = Papa.parse<T>(text, {
     header: true,
     skipEmptyLines: true,
@@ -26,24 +21,49 @@ function readCsv<T>(file: string): T[] {
   return parsed.data;
 }
 
+async function readCsv<T>(file: string): Promise<T[]> {
+  const text = await readCsvFromS3(file);
+  return parseCsv<T>(text);
+}
+
 // --- Raw row access ---------------------------------------------------------
 
-export function getCounterRows(lane: LaneId): CounterRow[] {
-  return readCsv<CounterRow>('counters.csv').filter((r) => r.lane === lane);
+export async function getCounterRows(lane: LaneId): Promise<CounterRow[]> {
+  const rows = await readCsv<CounterRow>('counters.csv');
+  return rows.filter((r) => r.lane === lane);
 }
 
-export function getFirstPickRows(lane: LaneId): FirstPickRow[] {
-  return readCsv<FirstPickRow>('first_pick.csv').filter((r) => r.lane === lane);
+export async function getFirstPickRows(lane: LaneId): Promise<FirstPickRow[]> {
+  const rows = await readCsv<FirstPickRow>('first_pick.csv');
+  return rows.filter((r) => r.lane === lane);
 }
 
-export function getBalanceRows(lane: LaneId): BalanceRow[] {
-  return readCsv<BalanceRow>('balance_pick.csv').filter((r) => r.lane === lane);
+export async function getBalanceRows(lane: LaneId): Promise<BalanceRow[]> {
+  const rows = await readCsv<BalanceRow>('balance_pick.csv');
+  return rows.filter((r) => r.lane === lane);
 }
 
-export function getLaneChampions(lane: LaneId): string[] {
-  return readCsv<LaneChampionRow>('champion_lanes.csv')
-    .filter((r) => r.lane === lane)
-    .map((r) => r.champion);
+export async function getLaneChampions(lane: LaneId): Promise<string[]> {
+  const rows = await readCsv<LaneChampionRow>('champion_lanes.csv');
+  return rows.filter((r) => r.lane === lane).map((r) => r.champion);
+}
+
+// --- All-rows access (for API) ----------------------------------------------
+
+export async function getAllCounterRows(): Promise<CounterRow[]> {
+  return readCsv<CounterRow>('counters.csv');
+}
+
+export async function getAllFirstPickRows(): Promise<FirstPickRow[]> {
+  return readCsv<FirstPickRow>('first_pick.csv');
+}
+
+export async function getAllBalanceRows(): Promise<BalanceRow[]> {
+  return readCsv<BalanceRow>('balance_pick.csv');
+}
+
+export async function getAllLaneChampionRows(): Promise<LaneChampionRow[]> {
+  return readCsv<LaneChampionRow>('champion_lanes.csv');
 }
 
 // --- Enriched (champion + reason) data for the UI ---------------------------
@@ -52,7 +72,7 @@ export function getLaneChampions(lane: LaneId): string[] {
 export async function getEnemyChampions(lane: LaneId): Promise<Recommendation[]> {
   const map = await getChampionMap();
   const seen = new Set<string>();
-  const rows = getCounterRows(lane);
+  const rows = await getCounterRows(lane);
   const out: Recommendation[] = [];
   for (const r of rows) {
     if (seen.has(r.enemy)) continue;
@@ -68,14 +88,16 @@ export async function getCounterPicks(
   enemy: string
 ): Promise<Recommendation[]> {
   const map = await getChampionMap();
-  return getCounterRows(lane)
+  const rows = await getCounterRows(lane);
+  return rows
     .filter((r) => r.enemy === enemy)
     .map((r) => ({ champion: resolveChampion(map, r.pick), reason: r.reason }));
 }
 
 export async function getFirstPicks(lane: LaneId): Promise<Recommendation[]> {
   const map = await getChampionMap();
-  return getFirstPickRows(lane).map((r) => ({
+  const rows = await getFirstPickRows(lane);
+  return rows.map((r) => ({
     champion: resolveChampion(map, r.pick),
     reason: r.reason,
   }));
@@ -85,7 +107,7 @@ export async function getBalancePicks(
   lane: LaneId
 ): Promise<Record<BalanceCategory, Recommendation[]>> {
   const map = await getChampionMap();
-  const rows = getBalanceRows(lane);
+  const rows = await getBalanceRows(lane);
   const result = {
     engage: [],
     aoe: [],
@@ -106,7 +128,8 @@ export async function getBalancePicks(
 /** Full champion pool for a lane, enriched, for the random picker. */
 export async function getRandomPool(lane: LaneId): Promise<Recommendation[]> {
   const map = await getChampionMap();
-  return getLaneChampions(lane).map((key) => ({
+  const champs = await getLaneChampions(lane);
+  return champs.map((key) => ({
     champion: resolveChampion(map, key),
   }));
 }

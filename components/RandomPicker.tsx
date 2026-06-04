@@ -1,17 +1,25 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { Recommendation } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import type { LaneId, Recommendation } from '@/lib/types';
+import { deleteRow } from '@/lib/csv-api';
 import ChampionTile from './ChampionTile';
+import DataFormModal from './DataFormModal';
 
 interface Props {
   pool: Recommendation[];
+  lane: LaneId;
+  editable: boolean;
 }
 
-export default function RandomPicker({ pool }: Props) {
+export default function RandomPicker({ pool, lane, editable }: Props) {
+  const router = useRouter();
   const [current, setCurrent] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [modal, setModal] = useState(false);
+  const [showPool, setShowPool] = useState(false);
 
   const roll = useCallback(() => {
     if (rolling || pool.length === 0) return;
@@ -29,6 +37,19 @@ export default function RandomPicker({ pool }: Props) {
       }
     }, 80);
   }, [pool, rolling]);
+
+  const handleDelete = async (p: Recommendation) => {
+    if (!confirm(`${p.champion.name} をプールから削除しますか？`)) return;
+    try {
+      await deleteRow('champion_lanes.csv', {
+        lane,
+        champion: p.champion.key,
+      });
+      router.refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'エラーが発生しました');
+    }
+  };
 
   const picked = current !== null ? pool[current] : null;
 
@@ -71,6 +92,67 @@ export default function RandomPicker({ pool }: Props) {
       </button>
 
       <p className="mt-4 text-xs text-gold/40">候補 {pool.length} 体からランダム抽選</p>
+
+      {editable && (
+        <div className="mt-6 w-full max-w-md space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowPool(!showPool)}
+            className="text-xs tracking-display uppercase text-gold/50 hover:text-gold-bright transition-colors"
+          >
+            {showPool ? '▾ プール一覧を閉じる' : '▸ プール一覧を表示'}
+          </button>
+
+          {showPool && (
+            <div className="panel p-4">
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+                {pool.map((p) => (
+                  <div key={p.champion.key} className="relative group/item flex flex-col items-center">
+                    <ChampionTile champion={p.champion} size="sm" />
+                    <div className="absolute -top-1 -right-1 hidden group-hover/item:flex">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(p)}
+                        className="w-5 h-5 flex items-center justify-center text-[10px] bg-abyss border border-gold-dark text-blood/70 hover:text-blood hover:border-blood transition-colors rounded-full"
+                        title="削除"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setModal(true)}
+                className="mt-4 w-full py-2 border border-dashed border-gold-dark text-gold/50 text-xs tracking-display uppercase hover:border-gold hover:text-gold-bright transition-colors"
+              >
+                + チャンピオンを追加
+              </button>
+            </div>
+          )}
+
+          {!showPool && (
+            <button
+              type="button"
+              onClick={() => setModal(true)}
+              className="w-full py-3 border border-dashed border-gold-dark text-gold/50 text-sm tracking-display uppercase hover:border-gold hover:text-gold-bright transition-colors"
+            >
+              + チャンピオンを追加
+            </button>
+          )}
+        </div>
+      )}
+
+      {modal && (
+        <DataFormModal
+          isOpen
+          onClose={() => setModal(false)}
+          lane={lane}
+          csvFile="champion_lanes.csv"
+          editMode="add"
+        />
+      )}
     </div>
   );
 }
